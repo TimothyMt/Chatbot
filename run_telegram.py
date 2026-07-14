@@ -47,8 +47,11 @@ async def main() -> None:
 
             for update in data.get("result", []):
                 offset = update["update_id"] + 1
-                for chat_id, text in telegram.extract_messages(update):
-                    logger.info("Tin từ chat_id=%s: %r", chat_id, text)
+                for chat_id, text, chat_type in telegram.extract_messages(update):
+                    logger.info("Tin từ %s chat_id=%s: %r", chat_type, chat_id, text)
+                    # Chỉ trả lời chat riêng của khách, không trả lời trong nhóm.
+                    if chat_type != "private":
+                        continue
                     reply = await process_message("telegram", chat_id, text)
                     if reply.text.strip():
                         await telegram.send_message(chat_id, reply.text)

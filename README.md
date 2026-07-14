@@ -55,6 +55,44 @@ curl -X POST localhost:8000/chat -H "Content-Type: application/json" \
 
 Các endpoint khác: `GET /health`, `POST /reload` (nạp lại sheet ngay).
 
+## Deploy lên Railway
+
+Trên Railway server có HTTPS công khai nên **dùng webhook** (không cần polling), và
+đọc được Google Sheet trực tiếp.
+
+**1. Tạo project & biến môi trường**
+- New Project → Deploy from GitHub repo → chọn repo này (branch của bạn).
+- Railway tự nhận Python (có `requirements.txt`, `.python-version`) và chạy theo `Procfile`.
+- Vào tab **Variables**, thêm các biến (xem `.env.example`):
+  ```
+  ANTHROPIC_API_KEY=...
+  GOOGLE_SHEET_ID=1T-iQfeUF3wEK2VH1GNvxWxokwvq9CQ8O4r7FBoVkC9Y
+  GOOGLE_SHEET_GID=0
+  QA_COLUMN_PAIRS=2:3,7:8,11:12
+  QA_SKIP_ROWS=2
+  TELEGRAM_BOT_TOKEN=...
+  TELEGRAM_ADMIN_CHAT_ID=      # điền sau khi lấy được ở bước 3
+  ```
+- Vào **Settings → Networking → Generate Domain** để có URL, ví dụ `https://xxx.up.railway.app`.
+
+**2. Nối webhook Telegram** — mở URL này trên trình duyệt (thay TOKEN và DOMAIN):
+```
+https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://<DOMAIN>/webhook/telegram
+```
+Thấy `{"ok":true,...}` là xong. Kiểm tra lại bằng `.../getWebhookInfo`.
+
+**3. Lấy chat_id nhóm nhân sự** (trên Railway, không dùng `get_chat_id.py` vì đã bật webhook):
+- Thêm bot vào nhóm nhân sự (đã `/setprivacy` → Disable ở @BotFather), gửi 1 tin trong nhóm.
+- Mở **tab Logs** của Railway, tìm dòng: `Tin trong supergroup chat_id=-100... (không trả lời)`.
+- Copy id đó vào biến `TELEGRAM_ADMIN_CHAT_ID` (Railway sẽ tự deploy lại).
+
+> Bot **không trả lời trong nhóm**, chỉ trả lời chat riêng của khách. Nhóm chỉ dùng để nhận thông báo.
+
+**4. Cập nhật dữ liệu:** sửa Google Sheet xong, bot tự nạp lại sau ~5 phút, hoặc gọi
+`POST https://<DOMAIN>/reload` để cập nhật ngay.
+
+---
+
 ## Bot Telegram để test (khuyên dùng khi thử nghiệm)
 
 Không cần domain/HTTPS, chạy bằng long-polling:

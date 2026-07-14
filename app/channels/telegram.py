@@ -39,13 +39,17 @@ async def send_photo(chat_id: str | int, image_url: str, caption: str = "") -> N
             logger.error("Gửi ảnh Telegram lỗi %s: %s", resp.status_code, resp.text)
 
 
-def extract_messages(update: dict) -> list[tuple[str, str]]:
-    """Rút (chat_id, text) từ một update webhook của Telegram."""
-    out: list[tuple[str, str]] = []
+def extract_messages(update: dict) -> list[tuple[str, str, str]]:
+    """Rút (chat_id, text, chat_type) từ một update webhook của Telegram.
+
+    chat_type: "private" (chat riêng của khách) / "group" / "supergroup" / ...
+    """
+    out: list[tuple[str, str, str]] = []
     msg = update.get("message") or update.get("edited_message")
     if msg:
-        chat_id = msg.get("chat", {}).get("id")
+        chat = msg.get("chat", {})
+        chat_id = chat.get("id")
         text = msg.get("text")
         if chat_id and text:
-            out.append((str(chat_id), text))
+            out.append((str(chat_id), text, chat.get("type", "")))
     return out

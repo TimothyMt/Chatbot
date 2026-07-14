@@ -93,7 +93,12 @@ async def zalo_webhook(request: Request) -> Response:
 @app.post("/webhook/telegram")
 async def telegram_webhook(request: Request) -> Response:
     update = await request.json()
-    for chat_id, text in telegram.extract_messages(update):
+    for chat_id, text, chat_type in telegram.extract_messages(update):
+        # Chỉ trả lời chat riêng của khách. Trong nhóm (nhân sự) thì chỉ log
+        # chat_id để tiện lấy id cấu hình, không trả lời để tránh spam.
+        if chat_type != "private":
+            logging.info("Tin trong %s chat_id=%s (không trả lời)", chat_type, chat_id)
+            continue
         reply = await process_message("telegram", chat_id, text)
         if reply.text.strip():
             await telegram.send_message(chat_id, reply.text)
