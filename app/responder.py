@@ -59,37 +59,42 @@ def _compose_with_ai(query: str, candidates: list[Candidate]) -> str:
     return text
 
 
-def answer(query: str) -> str:
-    """Trả về câu trả lời cho câu hỏi của khách."""
+def answer_with_meta(query: str) -> dict:
+    """Trả câu trả lời kèm metadata: nguồn (exact/ai/fallback/nearest) và điểm khớp."""
     query = (query or "").strip()
     if not query:
-        return settings.fallback_answer
+        return {"reply": settings.fallback_answer, "source": "fallback", "score": 0.0}
 
     candidates = search(query, top_k=settings.top_k)
     if not candidates:
-        return settings.fallback_answer
+        return {"reply": settings.fallback_answer, "source": "fallback", "score": 0.0}
 
     top = candidates[0]
     logger.info("Câu hỏi: %r | khớp cao nhất: %.1f (%r)", query, top.score, top.pair.question)
 
     # Tầng 2: khớp gần như tuyệt đối -> trả thẳng, không tốn AI.
     if top.score >= settings.exact_match_threshold:
-        return top.pair.answer
+        return {"reply": top.pair.answer, "source": "exact", "score": top.score}
 
     # Khớp quá thấp -> không đủ tin cậy.
     if top.score < settings.min_match_threshold:
-        return settings.fallback_answer
+        return {"reply": settings.fallback_answer, "source": "fallback", "score": top.score}
 
     # Tầng 1: dùng AI soạn câu trả lời bám sát dữ liệu.
     if settings.use_ai:
         try:
             ai_text = _compose_with_ai(query, candidates)
             if ai_text and "KHONG_BIET" not in ai_text:
-                return ai_text
+                return {"reply": ai_text, "source": "ai", "score": top.score}
             # Claude báo không đủ dữ liệu.
-            return settings.fallback_answer
+            return {"reply": settings.fallback_answer, "source": "fallback-ai", "score": top.score}
         except Exception as exc:  # noqa: BLE001
             logger.warning("Gọi Claude lỗi (%s), tạm dùng câu khớp gần nhất.", exc)
 
     # Không có AI (hoặc AI lỗi): dùng câu trả lời khớp gần nhất.
-    return top.pair.answer
+    return {"reply": top.pair.answer, "source": "nearest", "score": top.score}
+
+
+def answer(query: str) -> str:
+    """Trả về câu trả lời cho câu hỏi của khách."""
+    return answer_with_meta(query)["reply"]
