@@ -47,16 +47,22 @@ async def main() -> None:
 
             for update in data.get("result", []):
                 offset = update["update_id"] + 1
-                for chat_id, text, chat_type in telegram.extract_messages(update):
-                    logger.info("Tin từ %s chat_id=%s: %r", chat_type, chat_id, text)
-                    # Chỉ trả lời chat riêng của khách, không trả lời trong nhóm.
-                    if chat_type != "private":
-                        continue
-                    reply = await process_message("telegram", chat_id, text)
-                    if reply.text.strip():
-                        await telegram.send_message(chat_id, reply.text)
-                    for url, caption in reply.images:
-                        await telegram.send_photo(chat_id, url, caption)
+                for m in telegram.extract_messages(update):
+                    logger.info("Tin từ %s chat_id=%s: %r", m.chat_type, m.chat_id, m.text)
+                    if m.chat_type == "private":
+                        reply = await process_message("telegram", m.chat_id, m.text)
+                        if reply.text.strip():
+                            await telegram.send_message(m.chat_id, reply.text)
+                        for url, caption in reply.images:
+                            await telegram.send_photo(m.chat_id, url, caption)
+                    elif m.chat_id == settings.telegram_admin_chat_id and m.reply_to_text:
+                        # Nhân viên reply thông báo -> chuyển lời tới khách.
+                        customer_id = telegram.parse_customer_from_alert(m.reply_to_text)
+                        if customer_id:
+                            await telegram.send_message(customer_id, m.text)
+                            await telegram.send_message(
+                                m.chat_id, f"✅ Đã gửi tới khách {customer_id}."
+                            )
 
 
 if __name__ == "__main__":

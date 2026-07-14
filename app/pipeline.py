@@ -59,10 +59,11 @@ async def process_message(channel: str, user_id: str, text: str) -> Reply:
     matched_images = [] if is_order else image_library.match(text)
     reply.images = [(r.url, r.caption) for r in matched_images]
 
-    # Nếu bot không có câu trả lời văn bản nhưng đã có ảnh (kèm chú thích) trả
-    # lời thay -> bỏ câu fallback, để ảnh + chú thích tự trả lời.
     answered_by_image = is_fallback and bool(matched_images)
-    if answered_by_image:
+
+    # Câu khó (bot không biết): KHÔNG trả lời khách, để nhân viên tự xử lý.
+    # (Nếu đã có ảnh + chú thích trả lời thay thì vẫn gửi ảnh.)
+    if is_fallback:
         reply.text = ""
 
     # Thông báo: chốt đơn.

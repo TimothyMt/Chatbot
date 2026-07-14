@@ -40,10 +40,17 @@ async def order_placed(channel: str, user_id: str, message: str, phone: str) -> 
 
 
 async def hard_question(channel: str, user_id: str, question: str) -> None:
+    hint = (
+        "\n👉 Trả lời khách: bấm Reply (trả lời) tin này rồi gõ câu trả lời, "
+        "bot sẽ tự gửi cho khách."
+        if channel == "telegram"
+        else ""
+    )
     await _send_admin(
         "❓ CÂU HỎI KHÓ - bot chưa trả lời được\n"
         f"• Thời gian: {_now()}\n"
         f"• Kênh: {channel}\n"
         f"• Khách: {user_id}\n"
         f"• Câu hỏi: {question}"
+        f"{hint}"
     )

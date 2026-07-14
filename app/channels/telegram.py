@@ -2,12 +2,21 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 
 import httpx
 
 from ..config import settings
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class TgMessage:
+    chat_id: str
+    text: str
+    chat_type: str  # "private" (khách) / "group" / "supergroup" (nhân sự) / ...
+    reply_to_text: str = ""  # nội dung tin được reply (dùng cho nhân viên trả lời khách)
 
 
 def _api(method: str) -> str:
@@ -39,17 +48,32 @@ async def send_photo(chat_id: str | int, image_url: str, caption: str = "") -> N
             logger.error("Gửi ảnh Telegram lỗi %s: %s", resp.status_code, resp.text)
 
 
-def extract_messages(update: dict) -> list[tuple[str, str, str]]:
-    """Rút (chat_id, text, chat_type) từ một update webhook của Telegram.
-
-    chat_type: "private" (chat riêng của khách) / "group" / "supergroup" / ...
-    """
-    out: list[tuple[str, str, str]] = []
+def extract_messages(update: dict) -> list[TgMessage]:
+    """Rút thông tin tin nhắn từ một update webhook của Telegram."""
+    out: list[TgMessage] = []
     msg = update.get("message") or update.get("edited_message")
     if msg:
         chat = msg.get("chat", {})
         chat_id = chat.get("id")
         text = msg.get("text")
         if chat_id and text:
-            out.append((str(chat_id), text, chat.get("type", "")))
+            reply_to = (msg.get("reply_to_message") or {}).get("text", "")
+            out.append(
+                TgMessage(
+                    chat_id=str(chat_id),
+                    text=text,
+                    chat_type=chat.get("type", ""),
+                    reply_to_text=reply_to,
+                )
+            )
     return out
+
+
+def parse_customer_from_alert(alert_text: str) -> str | None:
+    """Từ tin thông báo (mà nhân viên reply vào), lấy chat_id của khách Telegram."""
+    import re
+
+    if "Kênh: telegram" not in alert_text:
+        return None
+    m = re.search(r"Khách:\s*(-?\d+)", alert_text)
+    return m.group(1) if m else None

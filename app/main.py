@@ -93,15 +93,22 @@ async def zalo_webhook(request: Request) -> Response:
 @app.post("/webhook/telegram")
 async def telegram_webhook(request: Request) -> Response:
     update = await request.json()
-    for chat_id, text, chat_type in telegram.extract_messages(update):
-        # Chỉ trả lời chat riêng của khách. Trong nhóm (nhân sự) thì chỉ log
-        # chat_id để tiện lấy id cấu hình, không trả lời để tránh spam.
-        if chat_type != "private":
-            logging.info("Tin trong %s chat_id=%s (không trả lời)", chat_type, chat_id)
+    for m in telegram.extract_messages(update):
+        if m.chat_type == "private":
+            # Khách chat riêng với bot.
+            reply = await process_message("telegram", m.chat_id, m.text)
+            if reply.text.strip():
+                await telegram.send_message(m.chat_id, reply.text)
+            for url, caption in reply.images:
+                await telegram.send_photo(m.chat_id, url, caption)
             continue
-        reply = await process_message("telegram", chat_id, text)
-        if reply.text.strip():
-            await telegram.send_message(chat_id, reply.text)
-        for url, caption in reply.images:
-            await telegram.send_photo(chat_id, url, caption)
+
+        # Trong nhóm nhân sự: nếu nhân viên REPLY vào thông báo -> chuyển lời tới khách.
+        if m.chat_id == settings.telegram_admin_chat_id and m.reply_to_text:
+            customer_id = telegram.parse_customer_from_alert(m.reply_to_text)
+            if customer_id:
+                await telegram.send_message(customer_id, m.text)
+                await telegram.send_message(m.chat_id, f"✅ Đã gửi tới khách {customer_id}.")
+                continue
+        logging.info("Tin trong %s chat_id=%s (không trả lời)", m.chat_type, m.chat_id)
     return PlainTextResponse("OK")
