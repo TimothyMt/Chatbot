@@ -1,0 +1,22 @@
+# Bộ eval chất lượng — chống hồi quy khi đổi prompt/ngưỡng/model.
+# Copy thành eval/questions.yaml và điền câu hỏi THẬT của shop (file này chỉ là
+# ví dụ cấu trúc; nội dung nghiệp vụ nằm ở file thật, không commit).
+#
+# Mỗi case:
+#   text:            câu khách nhắn (có thể nhiều dòng = nhắn dồn)
+#   history:         (tuỳ chọn) các lượt trước, dạng "role: nội dung"
+#   expect_intent:   intent kỳ vọng của entry khớp nhất
+#   expect_contains: chuỗi phải xuất hiện trong câu trả lời
+#   expect_hard:     true = kỳ vọng bot IM LẶNG + báo nhân sự
+cases:
+  - text: "phí ship bao nhiêu vậy shop"
+    expect_intent: phi_ship
+
+  - text: "nhiêu"
+    history:
+      - "customer: váy hoa nhí còn không shop"
+      - "bot: Dạ còn chị nhé"
+    expect_intent: hoi_gia
+
+  - text: "shop có bán kèm giày không"
+    expect_hard: true

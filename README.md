@@ -1,156 +1,62 @@
-# Chatbot chăm sóc khách hàng
+# Shop CSKH Bot
 
-Chatbot trả lời khách dựa trên bảng câu hỏi - trả lời (Q&A) có sẵn trên Google Sheets.
-Cơ chế **"1+2" kết hợp**:
+Chatbot chăm sóc khách hàng tiếng Việt cho shop bán quần áo online — hiểu ngữ
+nghĩa + ngữ cảnh, tự nạp & phân loại dữ liệu từ Google Sheet, học được từ
+nhân viên (có duyệt), không trả lời bậy.
 
-1. **Khớp câu hỏi (miễn phí, nhanh):** tìm câu gần giống nhất trong sheet bằng thuật toán fuzzy.
-   Nếu khớp gần như tuyệt đối → trả thẳng câu trả lời có sẵn.
-2. **AI soạn câu trả lời (Claude):** nếu khớp vừa phải, đưa các câu ứng viên cho Claude
-   soạn câu trả lời tự nhiên, **chỉ dùng thông tin trong sheet** (không bịa).
-3. Nếu không tìm được thông tin phù hợp → trả câu mặc định (mời để lại SĐT / chờ nhân viên).
+**Nguyên tắc:** mọi thông tin nghiệp vụ là dữ liệu (sheet / câu đã dạy, lưu
+Supabase) — không hardcode vào code hay prompt. Chạy được với bất kỳ shop nào.
 
-Kênh hỗ trợ: **Facebook Messenger** và **Zalo OA** (qua webhook), cùng endpoint `/chat` để test.
+## Tính năng
 
-## Cài đặt
+- **Ingest tự động**: đưa link Google Sheet (kể cả dạng kịch bản Pancake nhiều
+  khối, cột lộn xộn) → tự trích Q&A, gán intent/nhóm, loại nhiễu. Không cần
+  khai báo cột. Mỗi lần nạp là một phiên bản, rollback được.
+- **Hiểu ngữ cảnh**: viết lại câu cụt ("giá", "nhiêu") theo hội thoại rồi mới
+  semantic search (embeddings + pgvector) — không khớp nhầm kiểu so chữ.
+- **Vòng học**: câu khó → báo nhóm hỗ trợ → nhân viên reply là trả lời khách
+  ngay + vào hàng đợi duyệt (nút ✅/❌) → duyệt xong bot tự trả lời lần sau.
+  Lưu bền vững, không mất khi redeploy.
+- **An toàn**: ngoài phạm vi → im lặng với khách, chỉ báo nhân sự. Xác nhận
+  đơn bằng template cố định — không bịa chi tiết.
+- **Ảnh**: gửi ảnh theo intent (bảng size, STK...); ảnh khách gửi lên được
+  chuyển nhân sự kèm ngữ cảnh.
+- **Đo lường**: log đầy đủ từng lượt; `/stats` ra tỉ lệ trả lời/câu khó/đơn;
+  bộ eval chống hồi quy.
+
+## Chạy nhanh
 
 ```bash
-python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
+cp .env.example .env   # điền keys
 pip install -r requirements.txt
-cp .env.example .env      # rồi mở .env điền cấu hình
+python scripts/migrate.py       # tạo schema Supabase
+python scripts/ingest.py        # nạp sheet lần đầu
+uvicorn shopbot.main:app --reload
+python scripts/set_webhook.py https://<domain>   # sau khi deploy
 ```
 
-## Cấu hình `.env`
+Test (offline, không cần keys): `pip install -r requirements-dev.txt && pytest`
 
-- **Google Sheet:** mở sheet → Share → *Anyone with the link (Viewer)*, rồi điền `GOOGLE_SHEET_ID`
-  (phần giữa `/d/` và `/edit` trong URL) và `GOOGLE_SHEET_GID` (số `gid` của tab).
-  - **Sheet 2 cột đơn giản:** đặt tiêu đề `question` / `answer` (đổi tên trong `.env` nếu khác).
-  - **Sheet nhiều khối Q&A** (như bảng kịch bản Pancake): đọc theo *vị trí cột* bằng
-    `QA_COLUMN_PAIRS` và `QA_SKIP_ROWS`. Ví dụ sheet có 3 khối câu hỏi–trả lời ở các cột
-    2-3, 7-8, 11-12 và 2 dòng tiêu đề đầu → đặt `QA_COLUMN_PAIRS=2:3,7:8,11:12` và
-    `QA_SKIP_ROWS=2` (số cột tính từ 0).
-  Chưa cấu hình sheet thì bot dùng file `data/qa.csv` (hoặc `data/qa_sample.csv`).
-- **Claude:** điền `ANTHROPIC_API_KEY` để bật AI soạn câu trả lời. Bỏ trống → bot chỉ
-  chạy tầng khớp (trả câu có sẵn), vẫn hoạt động nhưng kém linh hoạt hơn.
+## Tài liệu
 
-## Chạy thử
+- [docs/architecture.md](docs/architecture.md) — kiến trúc, lý do thiết kế, schema
+- [docs/operations.md](docs/operations.md) — vận hành, dạy bot, rollback, sự cố
 
-Test nhanh trong terminal (không cần webhook):
+## Cấu trúc
 
-```bash
-python cli.py
 ```
-
-Chạy server:
-
-```bash
-uvicorn app.main:app --reload
+shopbot/
+  config.py        # cấu hình hạ tầng (env), persona là config
+  db.py            # toàn bộ SQL (Supabase/pgvector)
+  llm.py           # mọi lời gọi Claude (routing model rẻ/đắt)
+  embeddings.py    # OpenAI embeddings
+  ingest/          # sheet -> chunks -> LLM trích Q&A -> embed -> version
+  answer.py        # pipeline trả lời (ngữ cảnh -> search -> soạn/câu khó)
+  orders.py        # trích field + template xác nhận cố định
+  training.py      # vòng học + duyệt
+  telegram/        # webhook router, debounce, API
+migrations/        # schema SQL
+scripts/           # migrate / ingest / set_webhook
+eval/              # bộ đo chất lượng
+tests/             # unit test offline
 ```
-
-Test bằng API:
-
-```bash
-curl -X POST localhost:8000/chat -H "Content-Type: application/json" \
-  -d '{"message":"shop mở cửa lúc mấy giờ vậy?"}'
-```
-
-Các endpoint khác: `GET /health`, `POST /reload` (nạp lại sheet ngay).
-
-## Deploy lên Railway
-
-Trên Railway server có HTTPS công khai nên **dùng webhook** (không cần polling), và
-đọc được Google Sheet trực tiếp.
-
-**1. Tạo project & biến môi trường**
-- New Project → Deploy from GitHub repo → chọn repo này (branch của bạn).
-- Railway tự nhận Python (có `requirements.txt`, `.python-version`) và chạy theo `Procfile`.
-- Vào tab **Variables**, thêm các biến (xem `.env.example`):
-  ```
-  ANTHROPIC_API_KEY=...
-  GOOGLE_SHEET_ID=1T-iQfeUF3wEK2VH1GNvxWxokwvq9CQ8O4r7FBoVkC9Y
-  GOOGLE_SHEET_GID=0
-  QA_COLUMN_PAIRS=2:3,7:8,11:12
-  QA_SKIP_ROWS=2
-  TELEGRAM_BOT_TOKEN=...
-  TELEGRAM_ADMIN_CHAT_ID=      # điền sau khi lấy được ở bước 3
-  ```
-- Vào **Settings → Networking → Generate Domain** để có URL, ví dụ `https://xxx.up.railway.app`.
-
-**2. Nối webhook Telegram** — mở URL này trên trình duyệt (thay TOKEN và DOMAIN):
-```
-https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://<DOMAIN>/webhook/telegram
-```
-Thấy `{"ok":true,...}` là xong. Kiểm tra lại bằng `.../getWebhookInfo`.
-
-**3. Lấy chat_id nhóm nhân sự** (trên Railway, không dùng `get_chat_id.py` vì đã bật webhook):
-- Thêm bot vào nhóm nhân sự (đã `/setprivacy` → Disable ở @BotFather), gửi 1 tin trong nhóm.
-- Mở **tab Logs** của Railway, tìm dòng: `Tin trong supergroup chat_id=-100... (không trả lời)`.
-- Copy id đó vào biến `TELEGRAM_ADMIN_CHAT_ID` (Railway sẽ tự deploy lại).
-
-> Bot **không trả lời trong nhóm**, chỉ trả lời chat riêng của khách. Nhóm chỉ dùng để nhận thông báo.
-
-**4. Cập nhật dữ liệu:** sửa Google Sheet xong, bot tự nạp lại sau ~5 phút, hoặc gọi
-`POST https://<DOMAIN>/reload` để cập nhật ngay.
-
----
-
-## Bot Telegram để test (khuyên dùng khi thử nghiệm)
-
-Không cần domain/HTTPS, chạy bằng long-polling:
-
-1. Nhắn **@BotFather** trên Telegram → `/newbot` → lấy token, điền `TELEGRAM_BOT_TOKEN` vào `.env`.
-2. Chạy: `python run_telegram.py` rồi nhắn cho bot để test.
-
-## Kênh thông báo cho nhân viên
-
-Bot tự gửi cảnh báo (kèm giờ VN) vào một nhóm Telegram khi:
-- 🛒 **Chốt đơn** — khách để lại tin nhắn có số điện thoại + địa chỉ/thông tin đặt hàng.
-- ❓ **Câu hỏi khó** — bot không tìm được câu trả lời (kể cả bằng ảnh).
-
-**Thiết lập nhóm nhân sự (làm 1 lần):**
-
-1. Có `TELEGRAM_BOT_TOKEN` trong `.env` (tạo bot qua @BotFather).
-2. Tạo 1 **nhóm Telegram** cho nhân sự, **thêm bot vào nhóm**.
-   Ở @BotFather chạy `/setprivacy` → chọn bot → **Disable** để bot đọc được tin trong nhóm.
-3. Gửi 1 tin bất kỳ trong nhóm, rồi chạy:
-   ```bash
-   python get_chat_id.py      # in ra chat_id của nhóm (thường là số âm -100...)
-   ```
-   Copy id nhóm vào `TELEGRAM_ADMIN_CHAT_ID` trong `.env`.
-4. Kiểm tra nhóm nhận được thông báo:
-   ```bash
-   python test_notify.py      # gửi 2 tin mẫu (chốt đơn + câu khó) vào nhóm
-   ```
-
-## Gửi ảnh khi khách hỏi
-
-Bot tự gửi ảnh (bảng size, ảnh mẫu, màu, STK/QR…) khi câu hỏi chứa từ khoá tương ứng.
-Cấu hình trong `data/images.csv`:
-
-| Cột | Ý nghĩa |
-|---|---|
-| `keywords` | Các từ khoá cách nhau bởi `\|` (có/không dấu đều nhận) |
-| `image_url` | Link ảnh **công khai** của bạn (thay link mẫu `placehold.co`) |
-| `caption` | Chú thích gửi kèm ảnh |
-
-> Ảnh mẫu đang dùng link `placehold.co` để demo — **thay bằng link ảnh thật của shop**
-> (upload ảnh lên Google Drive/Imgur/hosting và dán link trực tiếp tới file ảnh).
-
-## Kết nối Messenger / Zalo
-
-Server cần chạy trên internet có HTTPS. Khi dev, dùng `ngrok http 8000` để lấy URL công khai.
-
-**Facebook Messenger** (cần Facebook Page + App):
-- Webhook URL: `https://<domain>/webhook/messenger`
-- Verify Token: đúng với `FB_VERIFY_TOKEN` trong `.env`
-- Điền `FB_PAGE_ACCESS_TOKEN`, subscribe field `messages` cho Page.
-
-**Zalo OA** (cần Official Account):
-- Webhook URL: `https://<domain>/webhook/zalo`
-- Điền `ZALO_OA_ACCESS_TOKEN`.
-
-## Điều chỉnh độ "nhạy"
-
-Trong `.env`:
-- `EXACT_MATCH_THRESHOLD` (mặc định 92): điểm ≥ ngưỡng → trả thẳng câu có sẵn.
-- `MIN_MATCH_THRESHOLD` (mặc định 45): điểm < ngưỡng → coi như không biết.
-- `TOP_K`: số câu ứng viên đưa cho Claude.
