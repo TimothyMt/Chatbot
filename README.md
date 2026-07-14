@@ -23,8 +23,12 @@ cp .env.example .env      # rồi mở .env điền cấu hình
 
 - **Google Sheet:** mở sheet → Share → *Anyone with the link (Viewer)*, rồi điền `GOOGLE_SHEET_ID`
   (phần giữa `/d/` và `/edit` trong URL) và `GOOGLE_SHEET_GID` (số `gid` của tab).
-  Sheet cần có 2 cột tiêu đề `question` và `answer` (đổi tên trong `.env` nếu khác).
-  Chưa cấu hình sheet thì bot dùng file mẫu `data/qa_sample.csv`.
+  - **Sheet 2 cột đơn giản:** đặt tiêu đề `question` / `answer` (đổi tên trong `.env` nếu khác).
+  - **Sheet nhiều khối Q&A** (như bảng kịch bản Pancake): đọc theo *vị trí cột* bằng
+    `QA_COLUMN_PAIRS` và `QA_SKIP_ROWS`. Ví dụ sheet có 3 khối câu hỏi–trả lời ở các cột
+    2-3, 7-8, 11-12 và 2 dòng tiêu đề đầu → đặt `QA_COLUMN_PAIRS=2:3,7:8,11:12` và
+    `QA_SKIP_ROWS=2` (số cột tính từ 0).
+  Chưa cấu hình sheet thì bot dùng file `data/qa.csv` (hoặc `data/qa_sample.csv`).
 - **Claude:** điền `ANTHROPIC_API_KEY` để bật AI soạn câu trả lời. Bỏ trống → bot chỉ
   chạy tầng khớp (trả câu có sẵn), vẫn hoạt động nhưng kém linh hoạt hơn.
 

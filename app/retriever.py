@@ -24,20 +24,24 @@ class Candidate:
 
 
 def search(query: str, top_k: int = 5) -> list[Candidate]:
-    """Trả về top_k câu Q&A gần giống nhất, sắp theo điểm giảm dần."""
+    """Trả về top_k câu Q&A gần giống nhất, sắp theo điểm giảm dần.
+
+    Điểm khớp = max(khớp với câu hỏi, 0.9 * khớp với nội dung trả lời).
+    Khớp thêm với nội dung trả lời giúp tìm ra câu đúng khi cách khách hỏi
+    khác hẳn cách ghi câu hỏi trong sheet, nhưng câu trả lời lại chứa từ khoá.
+    """
     pairs = knowledge_base.pairs
     if not pairs:
         return []
 
     norm_query = _normalize(query)
-    # Ánh xạ câu hỏi đã chuẩn hoá -> pair gốc
-    choices = {i: _normalize(p.question) for i, p in enumerate(pairs)}
+    scored: list[Candidate] = []
+    for p in pairs:
+        score_q = fuzz.token_set_ratio(norm_query, _normalize(p.question))
+        # Chỉ lấy phần đầu câu trả lời để giảm nhiễu do câu trả lời quá dài.
+        score_a = fuzz.token_set_ratio(norm_query, _normalize(p.answer[:250]))
+        score = max(score_q, 0.9 * score_a)
+        scored.append(Candidate(pair=p, score=score))
 
-    results = process.extract(
-        norm_query,
-        choices,
-        scorer=fuzz.token_set_ratio,
-        limit=top_k,
-    )
-    # process.extract trả về (matched_text, score, key)
-    return [Candidate(pair=pairs[key], score=score) for _, score, key in results]
+    scored.sort(key=lambda c: c.score, reverse=True)
+    return scored[:top_k]

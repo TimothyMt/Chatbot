@@ -18,11 +18,16 @@ class Settings(BaseSettings):
     qa_csv_path: str = "data/qa_sample.csv"
     qa_question_column: str = "question"
     qa_answer_column: str = "answer"
+    # Chế độ đọc theo vị trí cột (0-based) cho sheet nhiều khối Q&A.
+    # Ví dụ "2:3,7:8,11:12" = 3 khối, mỗi khối (cột hỏi : cột trả lời).
+    # Để trống -> đọc theo tên cột question/answer (2 cột đơn giản).
+    qa_column_pairs: str = ""
+    qa_skip_rows: int = 0  # số dòng tiêu đề bỏ qua khi dùng chế độ vị trí cột
 
     # Ngưỡng khớp
     exact_match_threshold: float = 92
     min_match_threshold: float = 45
-    top_k: int = 5
+    top_k: int = 8
     fallback_answer: str = (
         "Xin lỗi, mình chưa có thông tin cho câu hỏi này. "
         "Bạn vui lòng để lại số điện thoại hoặc đợi nhân viên hỗ trợ nhé!"
