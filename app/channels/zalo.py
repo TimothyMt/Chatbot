@@ -27,6 +27,29 @@ async def send_message(user_id: str, text: str) -> None:
             logger.error("Gửi Zalo lỗi %s: %s", resp.status_code, resp.text)
 
 
+async def send_image(user_id: str, image_url: str, caption: str = "") -> None:
+    if not settings.zalo_oa_access_token or not image_url:
+        return
+    payload = {
+        "recipient": {"user_id": user_id},
+        "message": {
+            "text": caption or " ",
+            "attachment": {
+                "type": "template",
+                "payload": {
+                    "template_type": "media",
+                    "elements": [{"media_type": "image", "url": image_url}],
+                },
+            },
+        },
+    }
+    headers = {"access_token": settings.zalo_oa_access_token}
+    async with httpx.AsyncClient(timeout=20) as client:
+        resp = await client.post(ZALO_SEND_URL, json=payload, headers=headers)
+        if resp.status_code >= 400:
+            logger.error("Gửi ảnh Zalo lỗi %s: %s", resp.status_code, resp.text)
+
+
 def extract_messages(body: dict) -> list[tuple[str, str]]:
     """Rút (user_id, text) từ payload webhook của Zalo OA."""
     out: list[tuple[str, str]] = []

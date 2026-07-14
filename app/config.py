@@ -40,6 +40,13 @@ class Settings(BaseSettings):
     # Zalo OA
     zalo_oa_access_token: str = ""
 
+    # Telegram (dùng để test + kênh thông báo nội bộ)
+    telegram_bot_token: str = ""
+    telegram_admin_chat_id: str = ""  # chat/group nhận thông báo cho nhân viên
+
+    # Gửi ảnh: file map từ khoá -> ảnh
+    images_csv_path: str = "data/images.csv"
+
     @property
     def sheet_csv_url(self) -> str:
         """Trả về URL CSV export của Google Sheet (nếu có cấu hình)."""

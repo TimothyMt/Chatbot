@@ -55,6 +55,36 @@ curl -X POST localhost:8000/chat -H "Content-Type: application/json" \
 
 Các endpoint khác: `GET /health`, `POST /reload` (nạp lại sheet ngay).
 
+## Bot Telegram để test (khuyên dùng khi thử nghiệm)
+
+Không cần domain/HTTPS, chạy bằng long-polling:
+
+1. Nhắn **@BotFather** trên Telegram → `/newbot` → lấy token, điền `TELEGRAM_BOT_TOKEN` vào `.env`.
+2. Chạy: `python run_telegram.py` rồi nhắn cho bot để test.
+
+## Kênh thông báo cho nhân viên
+
+Bot tự gửi cảnh báo vào một nhóm Telegram khi:
+- **Chốt đơn** — khách để lại tin nhắn có số điện thoại + địa chỉ/thông tin đặt hàng.
+- **Câu hỏi khó** — bot không tìm được câu trả lời (kể cả bằng ảnh).
+
+Cách lấy id nhóm: tạo 1 nhóm Telegram, thêm bot vào, gửi 1 tin trong nhóm — log của
+`run_telegram.py` sẽ in `chat_id`; điền id đó vào `TELEGRAM_ADMIN_CHAT_ID`.
+
+## Gửi ảnh khi khách hỏi
+
+Bot tự gửi ảnh (bảng size, ảnh mẫu, màu, STK/QR…) khi câu hỏi chứa từ khoá tương ứng.
+Cấu hình trong `data/images.csv`:
+
+| Cột | Ý nghĩa |
+|---|---|
+| `keywords` | Các từ khoá cách nhau bởi `\|` (có/không dấu đều nhận) |
+| `image_url` | Link ảnh **công khai** của bạn (thay link mẫu `placehold.co`) |
+| `caption` | Chú thích gửi kèm ảnh |
+
+> Ảnh mẫu đang dùng link `placehold.co` để demo — **thay bằng link ảnh thật của shop**
+> (upload ảnh lên Google Drive/Imgur/hosting và dán link trực tiếp tới file ảnh).
+
 ## Kết nối Messenger / Zalo
 
 Server cần chạy trên internet có HTTPS. Khi dev, dùng `ngrok http 8000` để lấy URL công khai.

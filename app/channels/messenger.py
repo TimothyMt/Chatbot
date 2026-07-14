@@ -38,6 +38,30 @@ async def send_message(recipient_id: str, text: str) -> None:
             logger.error("Gửi Messenger lỗi %s: %s", resp.status_code, resp.text)
 
 
+async def send_image(recipient_id: str, image_url: str, caption: str = "") -> None:
+    if not settings.fb_page_access_token or not image_url:
+        return
+    if caption:
+        await send_message(recipient_id, caption)
+    payload = {
+        "recipient": {"id": recipient_id},
+        "message": {
+            "attachment": {
+                "type": "image",
+                "payload": {"url": image_url, "is_reusable": True},
+            }
+        },
+    }
+    async with httpx.AsyncClient(timeout=20) as client:
+        resp = await client.post(
+            GRAPH_URL,
+            params={"access_token": settings.fb_page_access_token},
+            json=payload,
+        )
+        if resp.status_code >= 400:
+            logger.error("Gửi ảnh Messenger lỗi %s: %s", resp.status_code, resp.text)
+
+
 def extract_messages(body: dict) -> list[tuple[str, str]]:
     """Rút (sender_id, text) từ payload webhook của Messenger."""
     out: list[tuple[str, str]] = []
