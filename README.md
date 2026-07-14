@@ -64,12 +64,24 @@ Không cần domain/HTTPS, chạy bằng long-polling:
 
 ## Kênh thông báo cho nhân viên
 
-Bot tự gửi cảnh báo vào một nhóm Telegram khi:
-- **Chốt đơn** — khách để lại tin nhắn có số điện thoại + địa chỉ/thông tin đặt hàng.
-- **Câu hỏi khó** — bot không tìm được câu trả lời (kể cả bằng ảnh).
+Bot tự gửi cảnh báo (kèm giờ VN) vào một nhóm Telegram khi:
+- 🛒 **Chốt đơn** — khách để lại tin nhắn có số điện thoại + địa chỉ/thông tin đặt hàng.
+- ❓ **Câu hỏi khó** — bot không tìm được câu trả lời (kể cả bằng ảnh).
 
-Cách lấy id nhóm: tạo 1 nhóm Telegram, thêm bot vào, gửi 1 tin trong nhóm — log của
-`run_telegram.py` sẽ in `chat_id`; điền id đó vào `TELEGRAM_ADMIN_CHAT_ID`.
+**Thiết lập nhóm nhân sự (làm 1 lần):**
+
+1. Có `TELEGRAM_BOT_TOKEN` trong `.env` (tạo bot qua @BotFather).
+2. Tạo 1 **nhóm Telegram** cho nhân sự, **thêm bot vào nhóm**.
+   Ở @BotFather chạy `/setprivacy` → chọn bot → **Disable** để bot đọc được tin trong nhóm.
+3. Gửi 1 tin bất kỳ trong nhóm, rồi chạy:
+   ```bash
+   python get_chat_id.py      # in ra chat_id của nhóm (thường là số âm -100...)
+   ```
+   Copy id nhóm vào `TELEGRAM_ADMIN_CHAT_ID` trong `.env`.
+4. Kiểm tra nhóm nhận được thông báo:
+   ```bash
+   python test_notify.py      # gửi 2 tin mẫu (chốt đơn + câu khó) vào nhóm
+   ```
 
 ## Gửi ảnh khi khách hỏi
 
